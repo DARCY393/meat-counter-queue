@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0b1220;
+  --foreground: #f8fafc;
+  --accent: #f59e0b;
+  --accent-hot: #ef4444;
+  --panel: #111827;
+  --muted: #94a3b8;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Large touch targets & signage feel */
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+}

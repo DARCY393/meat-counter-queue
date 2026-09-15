@@ -14,8 +14,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Meat Counter Queue",
-  description: "Walk-up ticketing for a meat counter",
+  title: "Cost+Plus Carnicería | Meat Counter Queue",
+  description:
+    "Walk-up ticketing for Cost+Plus supermarket meat counter / carnicería",
 };
 
 export default function RootLayout({
@@ -24,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
       >

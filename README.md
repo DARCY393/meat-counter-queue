@@ -1,24 +1,29 @@
-# Meat Counter Queue
+# Cost+Plus Meat Counter Queue / Carnicería
 
-Walk-up ticketing MVP for a meat counter. Three browser views on one local Node process — no accounts, high-contrast signage UI, live updates over SSE.
+Walk-up ticketing MVP for **Cost+Plus** supermarket meat counter (carnicería). Three browser views on one local Node process — no accounts, high-contrast yellow/red signage UI, live updates over SSE.
+
+**Branding:** Cost+Plus yellow (`#FFD200` / `#F5C518`) and red (`#E30613` / `#C8102E`). Store wordmark + optional reference image at `public/branding-costplus.png` (supplied asset; not a third-party logo reproduction beyond that screenshot).
+
+**Language:** Spanish-first (`es` default). EN | ES toggle on home, kiosk, board, and counter. Preference persisted in `localStorage` key `mcp-lang` (`src/lib/i18n.ts`).
 
 ## Views
 
 | URL | Purpose |
 |-----|---------|
-| `/kiosk` | Customer walk-up: enter name (letters/spaces), tap **Get number** |
-| `/board` | TV behind the counter: **NOW SERVING** + **UP NEXT** (SSE + optional beep) |
-| `/counter` | Staff: full queue, huge **NEXT**, Skip / Recall, Reset day |
+| `/kiosk` | Customer walk-up: enter name (letters incl. áéíóúüñ + spaces), tap **Get number** / **Obtener número** |
+| `/board` | TV behind the counter: **Ahora sirviendo** / **Now Serving** + **Siguientes** / **Up Next** (SSE + optional beep) |
+| `/counter` | Staff: full queue, huge **SIGUIENTE** / **NEXT**, Skip / Recall, Reset day |
 
 Home page `/` links to all three.
 
 ## Behavior
 
 - Ticket numbers start at **1** and increment; persisted in `data/queue.json` across restarts.
-- States: `waiting` → `serving` → `done` (or `skipped`).
+- States: `waiting` → `serving` → `done` (or `skipped`). Labels localize to En espera / Sirviendo / Listo.
 - **NEXT**: current serving → done; next waiting → serving; if nobody waiting, clears NOW SERVING.
 - **Reset day** (counter, with confirm): clears tickets and renumbers from 1.
 - Live board/counter via `GET /api/events` (Server-Sent Events).
+- Names allow Spanish letters: `A-Za-z` plus `áéíóúüñÁÉÍÓÚÜÑ` and spaces.
 
 ## API
 
@@ -51,7 +56,7 @@ App listens on **http://localhost:3000** (or set `PORT`).
 2. Open **http://\<pc-ip\>:3000/board** fullscreen on the TV behind the counter.
 3. Open **http://\<pc-ip\>:3000/counter** on the staff machine.
 
-Flow: enter names on kiosk → press **NEXT** on counter → board updates live (beep when NOW SERVING changes).
+Flow: enter names on kiosk → press **NEXT** / **SIGUIENTE** on counter → board updates live (beep when NOW SERVING changes). Use the **EN | ES** toggle on any screen; default is Spanish.
 
 For LAN access, bind all interfaces if needed:
 
@@ -78,6 +83,7 @@ The counter **NEXT** button stands in for a rugged IP67 foot/hand switch. Future
 - Next.js App Router + TypeScript + Tailwind
 - Single Node process; in-memory store + JSON file under `data/`
 - SSE for live signage / counter refresh
+- Client i18n (`en` / `es`) via `src/lib/i18n.ts`
 
 ## Scripts
 

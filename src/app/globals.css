@@ -3,12 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --background: #0b1220;
-  --foreground: #f8fafc;
-  --accent: #f59e0b;
-  --accent-hot: #ef4444;
-  --panel: #111827;
-  --muted: #94a3b8;
+  --background: #7a0a12;
+  --foreground: #ffffff;
+  --cp-yellow: #ffd200;
+  --cp-yellow-deep: #f5c518;
+  --cp-red: #e30613;
+  --cp-red-deep: #c8102e;
+  --cp-red-dark: #8b0a14;
+  --accent: #ffd200;
+  --accent-hot: #e30613;
+  --panel: #9b1018;
+  --muted: #ffe9a0;
 }
 
 html,
@@ -26,11 +31,28 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+
+  .brand-wordmark {
+    text-shadow:
+      -1px -1px 0 #8b0a14,
+      1px -1px 0 #8b0a14,
+      -1px 1px 0 #8b0a14,
+      2px 2px 0 #c8102e,
+      3px 3px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  .cp-number {
+    color: var(--cp-yellow);
+    text-shadow:
+      0 0 2px #8b0a14,
+      2px 2px 0 #c8102e,
+      0 0 40px rgba(255, 210, 0, 0.35);
+  }
 }
 
-/* Large touch targets & signage feel */
+/* Large touch targets & signage feel — Cost+Plus yellow */
 button:focus-visible,
 input:focus-visible {
-  outline: 3px solid #f59e0b;
+  outline: 3px solid #ffd200;
   outline-offset: 2px;
 }

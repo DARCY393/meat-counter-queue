@@ -111,7 +111,7 @@ export function createTicket(name: string): Ticket {
   ensureLoaded();
   const store = getStore();
   const cleaned = name.trim().replace(/\s+/g, " ");
-  if (!cleaned || !/^[A-Za-z ]+$/.test(cleaned)) {
+  if (!cleaned || !/^[A-Za-záéíóúüñÁÉÍÓÚÜÑ ]+$/.test(cleaned)) {
     throw new Error("Name must contain only letters and spaces");
   }
   if (cleaned.length > 40) {

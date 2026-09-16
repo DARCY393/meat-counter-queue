@@ -12,6 +12,8 @@ export interface Ticket {
 export interface QueueState {
   nextNumber: number;
   tickets: Ticket[];
+  /** Calendar date YYYY-MM-DD in store timezone; used for midnight auto-reset */
+  businessDate?: string;
 }
 
 export interface PublicQueue {
@@ -20,4 +22,5 @@ export interface PublicQueue {
   waiting: Ticket[];
   recent: Ticket[];
   all: Ticket[];
+  businessDate?: string;
 }

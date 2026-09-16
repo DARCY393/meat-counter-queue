@@ -22,6 +22,7 @@ Home page `/` links to all three.
 - States: `waiting` → `serving` → `done` (or `skipped`). Labels localize to En espera / Sirviendo / Listo.
 - **NEXT**: current serving → done; next waiting → serving; if nobody waiting, clears NOW SERVING.
 - **Reset day** (counter, with confirm): clears tickets and renumbers from 1.
+- **Auto midnight reset**: queue clears and numbering restarts at 1 when the calendar day changes in `QUEUE_TZ` (default `America/Chicago`). Manual reset still available. Checks every 30s and on each API action.
 - Live board/counter via `GET /api/events` (Server-Sent Events).
 - Names allow Spanish letters: `A-Za-z` plus `áéíóúüñÁÉÍÓÚÜÑ` and spaces.
 
@@ -93,3 +94,12 @@ The counter **NEXT** button stands in for a rugged IP67 foot/hand switch. Future
 | `npm run build` | Production build |
 | `npm start` | Run production server |
 | `npm run lint` | ESLint |
+
+## Environment
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `PORT` | `3000` | HTTP port |
+| `HOSTNAME` | (Next default) | Set `0.0.0.0` for LAN |
+| `QUEUE_TZ` | `America/Chicago` | Timezone for midnight auto-reset |
+

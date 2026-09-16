@@ -5,9 +5,23 @@ import type { PublicQueue, QueueState, Ticket } from "./types";
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "queue.json");
 
+const QUEUE_TZ = process.env.QUEUE_TZ || "America/Chicago";
+
+function businessDateNow(): string {
+  // en-CA yields YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: QUEUE_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+
 const DEFAULT_STATE: QueueState = {
   nextNumber: 1,
   tickets: [],
+  businessDate: undefined,
 };
 
 type Listener = (queue: PublicQueue) => void;
@@ -45,6 +59,7 @@ function ensureLoaded() {
       store.state = {
         nextNumber: parsed.nextNumber ?? 1,
         tickets: Array.isArray(parsed.tickets) ? parsed.tickets : [],
+        businessDate: parsed.businessDate,
       };
     } else {
       persist();
@@ -53,6 +68,8 @@ function ensureLoaded() {
     store.state = { ...DEFAULT_STATE, tickets: [] };
   }
   store.loaded = true;
+  ensureBusinessDay();
+  startMidnightWatcher();
 }
 
 function persist() {
@@ -61,6 +78,36 @@ function persist() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
   fs.writeFileSync(DATA_FILE, JSON.stringify(store.state, null, 2), "utf-8");
+}
+
+
+let midnightTimer: ReturnType<typeof setInterval> | null = null;
+
+function startMidnightWatcher() {
+  if (midnightTimer) return;
+  midnightTimer = setInterval(() => {
+    try {
+      ensureLoaded();
+      ensureBusinessDay();
+    } catch {
+      // ignore
+    }
+  }, 30_000);
+}
+
+function ensureBusinessDay() {
+  const store = getStore();
+  const today = businessDateNow();
+  if (!store.state.businessDate) {
+    store.state.businessDate = today;
+    persist();
+    return;
+  }
+  if (store.state.businessDate !== today) {
+    store.state = { nextNumber: 1, tickets: [], businessDate: today };
+    persist();
+    notify();
+  }
 }
 
 function notify() {
@@ -86,7 +133,8 @@ export function subscribe(listener: Listener): () => void {
 
 export function getPublicQueue(): PublicQueue {
   ensureLoaded();
-  const { tickets } = getStore().state;
+  ensureBusinessDay();
+  const { tickets, businessDate } = getStore().state;
   const nowServing = tickets.find((t) => t.status === "serving") ?? null;
   const waiting = tickets.filter((t) => t.status === "waiting");
   const upNext = waiting.slice(0, 5);
@@ -100,6 +148,7 @@ export function getPublicQueue(): PublicQueue {
     waiting,
     recent,
     all: [...tickets].reverse(),
+    businessDate,
   };
 }
 
@@ -109,6 +158,7 @@ function nowIso() {
 
 export function createTicket(name: string): Ticket {
   ensureLoaded();
+  ensureBusinessDay();
   const store = getStore();
   const cleaned = name.trim().replace(/\s+/g, " ");
   if (!cleaned || !/^[A-Za-záéíóúüñÁÉÍÓÚÜÑ ]+$/.test(cleaned)) {
@@ -137,6 +187,7 @@ export function createTicket(name: string): Ticket {
 
 export function advanceNext(): PublicQueue {
   ensureLoaded();
+  ensureBusinessDay();
   const store = getStore();
   const ts = nowIso();
 
@@ -159,6 +210,7 @@ export function advanceNext(): PublicQueue {
 
 export function skipTicket(number?: number): PublicQueue {
   ensureLoaded();
+  ensureBusinessDay();
   const store = getStore();
   const ts = nowIso();
 
@@ -194,6 +246,7 @@ export function skipTicket(number?: number): PublicQueue {
 
 export function recallTicket(number: number): PublicQueue {
   ensureLoaded();
+  ensureBusinessDay();
   const store = getStore();
   const ts = nowIso();
   const ticket = store.state.tickets.find((t) => t.number === number);
@@ -229,10 +282,14 @@ export function recallTicket(number: number): PublicQueue {
 export function resetDay(): PublicQueue {
   ensureLoaded();
   const store = getStore();
-  store.state = { nextNumber: 1, tickets: [] };
+  store.state = { nextNumber: 1, tickets: [], businessDate: businessDateNow() };
   persist();
   notify();
   return getPublicQueue();
+}
+
+export function getQueueTimezone(): string {
+  return QUEUE_TZ;
 }
 
 export function sanitizeName(input: unknown): string {

@@ -94,7 +94,7 @@ const dictionaries = {
     offline: "sin conexión",
     resetDay: "Reiniciar día",
     resetConfirm:
-      "¿Reiniciar el día? Esto borra todos los turnos y empieza de nuevo en 1.",
+      "¿Reiniciar ahora? Los turnos también se borran solos a medianoche. Esto borra todo y empieza en 1.",
     next: "SIGUIENTE",
     skip: "Saltar",
     recall: "Llamar de nuevo",

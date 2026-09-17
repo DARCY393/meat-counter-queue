@@ -113,8 +113,14 @@ function ensureBusinessDay() {
 }
 
 function toPublicTicket(ticket: Ticket): PublicTicket {
-  const { phone: _p, smsConsentAt: _c, smsNotifiedAt: _n, ...rest } = ticket;
-  return rest;
+  return {
+    id: ticket.id,
+    number: ticket.number,
+    name: ticket.name,
+    status: ticket.status,
+    createdAt: ticket.createdAt,
+    updatedAt: ticket.updatedAt,
+  };
 }
 
 function notify() {

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicQueue } from "./types";
 
+export { formatTicketNumber } from "./ticketFormat";
+
 const EMPTY: PublicQueue = {
   nowServing: null,
   upNext: [],
@@ -70,8 +72,4 @@ export function useQueue(options?: { onUpdate?: () => void }) {
   }, [refresh]);
 
   return { queue, connected, refresh };
-}
-
-export function formatTicketNumber(n: number): string {
-  return String(n).padStart(3, "0");
 }

@@ -7,7 +7,19 @@ export interface Ticket {
   status: TicketStatus;
   createdAt: string;
   updatedAt: string;
+  /** E.164 phone when customer opted in for SMS near-front notify */
+  phone?: string;
+  /** ISO timestamp when SMS consent was given */
+  smsConsentAt?: string;
+  /** ISO timestamp when near-front SMS was sent; null/undefined until sent */
+  smsNotifiedAt?: string | null;
 }
+
+/** Client-facing ticket without phone / consent fields */
+export type PublicTicket = Omit<
+  Ticket,
+  "phone" | "smsConsentAt" | "smsNotifiedAt"
+>;
 
 export interface QueueState {
   nextNumber: number;
@@ -17,10 +29,10 @@ export interface QueueState {
 }
 
 export interface PublicQueue {
-  nowServing: Ticket | null;
-  upNext: Ticket[];
-  waiting: Ticket[];
-  recent: Ticket[];
-  all: Ticket[];
+  nowServing: PublicTicket | null;
+  upNext: PublicTicket[];
+  waiting: PublicTicket[];
+  recent: PublicTicket[];
+  all: PublicTicket[];
   businessDate?: string;
 }

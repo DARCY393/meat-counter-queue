@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
-import type { PublicQueue, QueueState, Ticket } from "./types";
+import { normalizeUsPhone } from "./phone";
+import { getSmsNotifyWhenAhead, sendNearFrontSms } from "./sms";
+import type { PublicQueue, PublicTicket, QueueState, Ticket } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "queue.json");
@@ -110,6 +112,11 @@ function ensureBusinessDay() {
   }
 }
 
+function toPublicTicket(ticket: Ticket): PublicTicket {
+  const { phone: _p, smsConsentAt: _c, smsNotifiedAt: _n, ...rest } = ticket;
+  return rest;
+}
+
 function notify() {
   const store = getStore();
   const queue = getPublicQueue();
@@ -119,6 +126,45 @@ function notify() {
     } catch {
       // ignore broken listeners
     }
+  });
+}
+
+/**
+ * After waiting-order mutations: if a consented waiting ticket has
+ * waiting-index < SMS_NOTIFY_WHEN_AHEAD (default 2), send ONE SMS and set smsNotifiedAt.
+ * Position 0 = first waiting (next to be served after current serving clears).
+ */
+async function maybeNotifyNearFront(): Promise<void> {
+  ensureLoaded();
+  const store = getStore();
+  const waiting = store.state.tickets.filter((t) => t.status === "waiting");
+  const threshold = getSmsNotifyWhenAhead();
+  let changed = false;
+
+  for (let i = 0; i < waiting.length && i < threshold; i++) {
+    const ticket = waiting[i];
+    if (!ticket.phone || !ticket.smsConsentAt || ticket.smsNotifiedAt) {
+      continue;
+    }
+    const sent = await sendNearFrontSms(ticket.phone, ticket.number);
+    if (sent) {
+      ticket.smsNotifiedAt = nowIso();
+      ticket.updatedAt = ticket.smsNotifiedAt;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    persist();
+    notify();
+  }
+}
+
+function afterWaitingOrderChange() {
+  persist();
+  notify();
+  void maybeNotifyNearFront().catch((err) => {
+    console.warn("[sms] near-front notify error:", err);
   });
 }
 
@@ -135,19 +181,20 @@ export function getPublicQueue(): PublicQueue {
   ensureLoaded();
   ensureBusinessDay();
   const { tickets, businessDate } = getStore().state;
-  const nowServing = tickets.find((t) => t.status === "serving") ?? null;
-  const waiting = tickets.filter((t) => t.status === "waiting");
-  const upNext = waiting.slice(0, 5);
+  const nowServingRaw = tickets.find((t) => t.status === "serving") ?? null;
+  const waitingRaw = tickets.filter((t) => t.status === "waiting");
+  const upNext = waitingRaw.slice(0, 5).map(toPublicTicket);
   const recent = tickets
     .filter((t) => t.status === "done" || t.status === "skipped")
     .slice(-8)
-    .reverse();
+    .reverse()
+    .map(toPublicTicket);
   return {
-    nowServing,
+    nowServing: nowServingRaw ? toPublicTicket(nowServingRaw) : null,
     upNext,
-    waiting,
+    waiting: waitingRaw.map(toPublicTicket),
     recent,
-    all: [...tickets].reverse(),
+    all: [...tickets].reverse().map(toPublicTicket),
     businessDate,
   };
 }
@@ -156,16 +203,43 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export function createTicket(name: string): Ticket {
+export type CreateTicketInput = {
+  name: string;
+  phone?: string | null;
+  smsConsent?: boolean;
+};
+
+export function createTicket(input: CreateTicketInput | string): Ticket {
   ensureLoaded();
   ensureBusinessDay();
   const store = getStore();
-  const cleaned = name.trim().replace(/\s+/g, " ");
+
+  const opts: CreateTicketInput =
+    typeof input === "string" ? { name: input } : input;
+
+  const cleaned = opts.name.trim().replace(/\s+/g, " ");
   if (!cleaned || !/^[A-Za-záéíóúüñÁÉÍÓÚÜÑ ]+$/.test(cleaned)) {
     throw new Error("Name must contain only letters and spaces");
   }
   if (cleaned.length > 40) {
     throw new Error("Name is too long (max 40 characters)");
+  }
+
+  const rawPhone =
+    typeof opts.phone === "string" && opts.phone.trim() ? opts.phone : null;
+  let phone: string | undefined;
+  let smsConsentAt: string | undefined;
+
+  if (rawPhone) {
+    if (!opts.smsConsent) {
+      throw new Error("SMS consent is required when a phone number is provided");
+    }
+    const normalized = normalizeUsPhone(rawPhone);
+    if (!normalized) {
+      throw new Error("Invalid US phone number");
+    }
+    phone = normalized;
+    smsConsentAt = nowIso();
   }
 
   const ticket: Ticket = {
@@ -175,13 +249,14 @@ export function createTicket(name: string): Ticket {
     status: "waiting",
     createdAt: nowIso(),
     updatedAt: nowIso(),
+    ...(phone
+      ? { phone, smsConsentAt, smsNotifiedAt: null }
+      : {}),
   };
-
 
   store.state.nextNumber += 1;
   store.state.tickets.push(ticket);
-  persist();
-  notify();
+  afterWaitingOrderChange();
   return ticket;
 }
 
@@ -203,8 +278,7 @@ export function advanceNext(): PublicQueue {
     nextWaiting.updatedAt = ts;
   }
 
-  persist();
-  notify();
+  afterWaitingOrderChange();
   return getPublicQueue();
 }
 
@@ -239,8 +313,7 @@ export function skipTicket(number?: number): PublicQueue {
     }
   }
 
-  persist();
-  notify();
+  afterWaitingOrderChange();
   return getPublicQueue();
 }
 
@@ -274,8 +347,7 @@ export function recallTicket(number: number): PublicQueue {
   ticket.status = "serving";
   ticket.updatedAt = ts;
 
-  persist();
-  notify();
+  afterWaitingOrderChange();
   return getPublicQueue();
 }
 

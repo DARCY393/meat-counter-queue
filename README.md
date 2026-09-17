@@ -10,9 +10,9 @@ Walk-up ticketing MVP for **Cost+Plus** supermarket meat counter (carnicería). 
 
 | URL | Purpose |
 |-----|---------|
-| `/kiosk` | Customer walk-up: enter name (letters incl. áéíóúüñ + spaces), tap **Get number** / **Obtener número** |
-| `/board` | TV behind the counter: **Ahora sirviendo** / **Now Serving** + **Siguientes** / **Up Next** (SSE + optional beep) |
-| `/counter` | Staff: full queue, huge **SIGUIENTE** / **NEXT**, Skip / Recall, Reset day |
+| `/kiosk` | Customer walk-up: enter name (letters incl. áéíóúüñ + spaces), optional phone + SMS consent, tap **Get number** / **Obtener número** |
+| `/board` | TV behind the counter: **Ahora sirviendo** / **Now Serving** + **Siguientes** / **Up Next** (SSE + optional beep). Phone numbers are never shown. |
+| `/counter` | Staff: full queue, huge **SIGUIENTE** / **NEXT**, Skip / Recall, Reset day. Phone numbers omitted from the UI. |
 
 Home page `/` links to all three.
 
@@ -26,13 +26,25 @@ Home page `/` links to all three.
 - Live board/counter via `GET /api/events` (Server-Sent Events).
 - Names allow Spanish letters: `A-Za-z` plus `áéíóúüñÁÉÍÓÚÜÑ` and spaces.
 
+### Optional SMS near-front notify
+
+On the kiosk, customers may enter a US mobile number. If a phone is entered, they must check a consent box agreeing to receive an SMS when near the front of the line.
+
+- Phone is normalized to E.164 (`+1…`) and stored on the ticket with `smsConsentAt` (ISO) and `smsNotifiedAt` (null until sent).
+- After queue mutations that change waiting order (`create`, `next`, `skip`, `recall`), the server checks the **waiting** array.
+- **Position** = index in the waiting array (`0` = first waiting = next to be served after the current serving clears).
+- If a waiting ticket has consent + phone, `smsNotifiedAt` is unset, and **waiting index &lt; `SMS_NOTIFY_WHEN_AHEAD`**, one SMS is sent via Twilio and `smsNotifiedAt` is set. Default threshold **N = 2** (the first two waiting people enter the notify window).
+- SMS body is Spanish-first, includes the ticket number, and asks the customer to come to the carnicería / meat counter.
+- If Twilio env vars are missing, the app still works; sends are skipped with a server warning log.
+- Public queue payloads (board / counter / SSE) strip phone and consent fields so numbers are never displayed on `/board` or `/counter`.
+
 ## API
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/tickets` | `{ "name": "Alex" }` | Issue ticket |
+| `POST` | `/api/tickets` | `{ "name": "Alex", "phone"?: "+15551234567", "smsConsent"?: true }` | Issue ticket. If `phone` is present, `smsConsent` must be `true`. |
 | `POST` | `/api/next` | — | Advance queue |
-| `GET` | `/api/queue` | — | Snapshot |
+| `GET` | `/api/queue` | — | Snapshot (phones stripped) |
 | `POST` | `/api/reset` | — | Reset day |
 | `POST` | `/api/skip` | `{ "number"?: n }` | Skip serving or ticket `n` |
 | `POST` | `/api/recall` | `{ "number": n }` | Recall done/skipped ticket |
@@ -71,9 +83,18 @@ HOSTNAME=0.0.0.0 npm start
 npm run dev
 ```
 
+### Testing SMS near-front notify
+
+1. Set Twilio env vars (see below) and optionally `SMS_NOTIFY_WHEN_AHEAD=2`.
+2. `npm run dev`
+3. On `/kiosk`, create tickets with phone + consent checked (use a number you control in Twilio trial).
+4. Create enough waiting tickets that someone sits at waiting index 0 or 1 (with default N=2).
+5. Press **NEXT** / skip / recall on `/counter` and confirm exactly one SMS arrives; `data/queue.json` should show `smsNotifiedAt` set for that ticket.
+6. Unset Twilio vars and confirm the app still runs (warning in server logs, no crash).
+
 ## Data
 
-Queue state lives in `data/queue.json`. The file is created automatically. Do not commit live queue data.
+Queue state lives in `data/queue.json`. The file is created automatically. Do not commit live queue data. Tickets may include `phone`, `smsConsentAt`, and `smsNotifiedAt` on disk only — never commit secrets or production queue dumps.
 
 ## Physical switch (future)
 
@@ -85,6 +106,7 @@ The counter **NEXT** button stands in for a rugged IP67 foot/hand switch. Future
 - Single Node process; in-memory store + JSON file under `data/`
 - SSE for live signage / counter refresh
 - Client i18n (`en` / `es`) via `src/lib/i18n.ts`
+- Optional Twilio SMS (`twilio` package) for near-front notify
 
 ## Scripts
 
@@ -102,4 +124,9 @@ The counter **NEXT** button stands in for a rugged IP67 foot/hand switch. Future
 | `PORT` | `3000` | HTTP port |
 | `HOSTNAME` | (Next default) | Set `0.0.0.0` for LAN |
 | `QUEUE_TZ` | `America/Chicago` | Timezone for midnight auto-reset |
+| `TWILIO_ACCOUNT_SID` | — | Twilio Account SID (optional; SMS skipped if unset) |
+| `TWILIO_AUTH_TOKEN` | — | Twilio Auth Token (optional) |
+| `TWILIO_FROM_NUMBER` | — | Twilio from number in E.164 (optional) |
+| `SMS_NOTIFY_WHEN_AHEAD` | `2` | Notify when waiting index &lt; N (N=2 → first two waiting) |
 
+Never commit `.env` / secrets. Local env files are gitignored.
